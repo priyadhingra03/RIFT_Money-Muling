@@ -187,10 +187,42 @@ function scoringEngine({
     processing_time_seconds: parseFloat(processingTimeSeconds.toFixed(2))
   }
 
+  // ----------------------------
+  // 9️⃣ Build graph_data for frontend
+  // ----------------------------
+
+  const suspiciousSet = new Set(suspiciousAccounts.map(a => a.account_id))
+
+  const graphNodes = Object.keys(graph.nodes).map(id => {
+    const accInfo = suspiciousAccounts.find(a => a.account_id === id)
+    return {
+      id,
+      label: id,
+      suspicious: suspiciousSet.has(id),
+      score: accInfo?.suspicion_score || 0,
+      detected_patterns: accInfo?.detected_patterns || [],
+      ring_id: accInfo?.ring_id || null,
+      ...graph.nodes[id]
+    }
+  })
+
+  const graphEdges = graph.edges.map((tx, i) => ({
+    id: `e${i}`,
+    source: tx.sender_id,
+    target: tx.receiver_id,
+    amount: tx.amount,
+    timestamp: tx.timestamp,
+    transaction_type: tx.transaction_type || null
+  }))
+
   return {
     suspicious_accounts: suspiciousAccounts,
     fraud_rings: fraudRings,
-    summary
+    summary,
+    graph_data: {
+      nodes: graphNodes,
+      edges: graphEdges
+    }
   }
 }
 

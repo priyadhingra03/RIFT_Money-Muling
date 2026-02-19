@@ -10,13 +10,15 @@ class Graph {
   }
 
   addTransaction(tx) {
-    const { sender_id, receiver_id, timestamp } = tx
+    const { sender_id, receiver_id, timestamp, amount } = tx
 
     // Initialize sender
     if (!this.nodes[sender_id]) {
       this.nodes[sender_id] = {
         total_sent: 0,
         total_received: 0,
+        amount_sent: 0,
+        amount_received: 0,
         transaction_count: 0,
         first_tx: timestamp,
         last_tx: timestamp
@@ -28,14 +30,19 @@ class Graph {
       this.nodes[receiver_id] = {
         total_sent: 0,
         total_received: 0,
+        amount_sent: 0,
+        amount_received: 0,
         transaction_count: 0,
         first_tx: timestamp,
         last_tx: timestamp
       }
     }
 
+    const amt = parseFloat(amount) || 0
+
     // Update sender
     this.nodes[sender_id].total_sent += 1
+    this.nodes[sender_id].amount_sent += amt
     this.nodes[sender_id].transaction_count += 1
     this.nodes[sender_id].first_tx =
       Math.min(this.nodes[sender_id].first_tx, timestamp)
@@ -44,6 +51,7 @@ class Graph {
 
     // Update receiver
     this.nodes[receiver_id].total_received += 1
+    this.nodes[receiver_id].amount_received += amt
     this.nodes[receiver_id].transaction_count += 1
     this.nodes[receiver_id].first_tx =
       Math.min(this.nodes[receiver_id].first_tx, timestamp)
