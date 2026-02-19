@@ -6,8 +6,7 @@
 
 ## 🔴 Live Demo
 
-> _Deploy URL will be added after Render + Vercel deployment_
-
+> https://rift-money-muling-5osucl2hl-priyadhingra03s-projects.vercel.app/
 ---
 
 ## 🛠 Tech Stack
