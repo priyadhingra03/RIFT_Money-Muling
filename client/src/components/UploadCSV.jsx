@@ -1,5 +1,6 @@
 import { useState } from "react"
 import axios from "axios"
+import "./UploadCSV.css"
 
 const UploadCSV = () => {
   const [file, setFile] = useState(null)
@@ -37,15 +38,14 @@ const UploadCSV = () => {
   }
 
   return (
-    <div style={{ padding: "20px" }}>
+    <div className="upload-container">
       <h2>Upload CSV File</h2>
 
       <input type="file" accept=".csv" onChange={handleFileChange} />
-      <br /><br />
       <button onClick={handleUpload}>Upload</button>
 
       {response && (
-        <div style={{ marginTop: "20px" }}>
+        <div className="response">
           <h3>Response:</h3>
           <pre>{JSON.stringify(response, null, 2)}</pre>
         </div>

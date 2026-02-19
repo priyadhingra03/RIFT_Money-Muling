@@ -1,8 +1,9 @@
 import UploadCSV from "./components/UploadCSV"
+import "./App.css"
 
 function App() {
   return (
-    <div>
+    <div className="app-container">
       <UploadCSV />
     </div>
   )
