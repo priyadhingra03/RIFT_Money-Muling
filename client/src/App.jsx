@@ -1,6 +1,6 @@
 import { useState } from "react"
 import UploadView from "./components/UploadView"
-import GraphDashboard from "./components/GraphDashboard"
+import ResultsPage from "./components/ResultsPage"
 import "./App.css"
 
 function App() {
@@ -8,7 +8,7 @@ function App() {
 
   if (analysisResult) {
     return (
-      <GraphDashboard
+      <ResultsPage
         data={analysisResult}
         onBack={() => setAnalysisResult(null)}
       />

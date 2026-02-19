@@ -34,7 +34,7 @@ const PATTERN_COLORS = {
 
 // ─── main component ─────────────────────────────────────────────────────────
 
-const GraphDashboard = ({ data, onBack }) => {
+const GraphDashboard = ({ data, onBack, embedded = false }) => {
     const containerRef = useRef(null)
     const cyRef = useRef(null)
     const [tooltip, setTooltip] = useState(null)
@@ -167,7 +167,16 @@ const GraphDashboard = ({ data, onBack }) => {
         cy.on("viewport", () => setTooltip(null))
 
         cyRef.current = cy
-        return () => cy.destroy()
+
+        // When embedded in a tab the container finalises its pixel size
+        // after the first browser paint — resize() re-measures it, then
+        // fit() centres all nodes in the newly-known viewport.
+        const fitTimer = setTimeout(() => {
+            cy.resize()
+            cy.fit(undefined, 40)
+        }, 120)
+
+        return () => { clearTimeout(fitTimer); cy.destroy() }
     }, [data, layout])
 
     const switchLayout = (name) => {
@@ -179,31 +188,71 @@ const GraphDashboard = ({ data, onBack }) => {
     const handleFit = () => cyRef.current?.fit(undefined, 50)
 
     const handleDownload = () => {
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
+        const output = {
+            suspicious_accounts: [...(data.suspicious_accounts ?? [])]
+                .sort((a, b) => (b.suspicion_score ?? 0) - (a.suspicion_score ?? 0))
+                .map(acc => ({
+                    account_id: acc.account_id,
+                    suspicion_score: acc.suspicion_score,
+                    detected_patterns: acc.detected_patterns ?? [],
+                    ring_id: acc.ring_id ?? null,
+                })),
+            fraud_rings: (data.fraud_rings ?? []).map(r => ({
+                ring_id: r.ring_id,
+                member_accounts: r.member_accounts ?? [],
+                pattern_type: r.pattern_type,
+                risk_score: r.risk_score,
+            })),
+            summary: data.summary ?? {},
+        }
+        const jsonStr = JSON.stringify(output, null, 2)
         const a = Object.assign(document.createElement("a"), {
-            href: URL.createObjectURL(blob), download: "rift_analysis.json"
+            href: "data:application/json;charset=utf-8," + encodeURIComponent(jsonStr),
+            download: "rift_analysis.json",
         })
+        document.body.appendChild(a)
         a.click()
+        document.body.removeChild(a)
     }
 
     return (
-        <div className="gd-root">
+        <div className="gd-root" style={embedded ? {
+            width: "100%", height: "100%",
+            display: "flex", flexDirection: "column",
+            background: "#060f1a"
+        } : {}}>
 
-            {/* ── Top Bar ── */}
-            <div className="gd-topbar">
-                <div className="gd-topbar-left">
-                    <button className="gd-back" onClick={onBack}>← Back</button>
-                    <span className="gd-title">RIFT <em>Graph Analysis</em></span>
+            {/* ── Top Bar (hidden when embedded) ── */}
+            {!embedded && (
+                <div className="gd-topbar">
+                    <div className="gd-topbar-left">
+                        <button className="gd-back" onClick={onBack}>← Back</button>
+                        <span className="gd-title">RIFT <em>Graph Analysis</em></span>
+                    </div>
+
+                    <div className="gd-summary">
+                        <SChip label="Accounts" value={summary.total_accounts_analyzed ?? "—"} />
+                        <SChip label="Flagged" value={summary.suspicious_accounts_flagged ?? "—"} color="#ef4444" />
+                        <SChip label="Rings" value={summary.fraud_rings_detected ?? "—"} color="#f97316" />
+                        <SChip label="Time" value={`${summary.processing_time_seconds ?? "—"}s`} />
+                    </div>
+
+                    <div className="gd-controls">
+                        <span className="gd-ctrl-label">Layout</span>
+                        {["cose", "circle", "grid", "breadthfirst"].map(l => (
+                            <button key={l}
+                                className={`gd-lbtn ${layout === l ? "active" : ""}`}
+                                onClick={() => switchLayout(l)}>{l}</button>
+                        ))}
+                        <button className="gd-lbtn" onClick={handleFit}>Fit ⊡</button>
+                        <button className="gd-lbtn gd-dl" onClick={handleDownload}>⬇ JSON</button>
+                    </div>
                 </div>
+            )}
 
-                <div className="gd-summary">
-                    <SChip label="Accounts" value={summary.total_accounts_analyzed ?? "—"} />
-                    <SChip label="Flagged" value={summary.suspicious_accounts_flagged ?? "—"} color="#ef4444" />
-                    <SChip label="Rings" value={summary.fraud_rings_detected ?? "—"} color="#f97316" />
-                    <SChip label="Time" value={`${summary.processing_time_seconds ?? "—"}s`} />
-                </div>
-
-                <div className="gd-controls">
+            {/* ── Embedded controls (layout bar only) ── */}
+            {embedded && (
+                <div className="gd-embed-controls">
                     <span className="gd-ctrl-label">Layout</span>
                     {["cose", "circle", "grid", "breadthfirst"].map(l => (
                         <button key={l}
@@ -213,10 +262,12 @@ const GraphDashboard = ({ data, onBack }) => {
                     <button className="gd-lbtn" onClick={handleFit}>Fit ⊡</button>
                     <button className="gd-lbtn gd-dl" onClick={handleDownload}>⬇ JSON</button>
                 </div>
-            </div>
+            )}
 
             {/* ── Canvas ── */}
-            <div className="gd-canvas-wrap">
+            <div className="gd-canvas-wrap" style={embedded ? {
+                flex: 1, position: "relative", overflow: "hidden", minHeight: 0
+            } : {}}>
                 <div ref={containerRef} className="gd-canvas" />
 
                 {/* Legend */}
