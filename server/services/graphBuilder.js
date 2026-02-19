@@ -1,50 +1,63 @@
 class Graph {
   constructor() {
-    this.nodes = new Set()
+    this.nodes = {}              // account_id -> metadata object
 
-    this.adjList = new Map()          // sender -> [receivers]
-    this.reverseAdjList = new Map()   // receiver -> [senders]
+    this.adjList = {}
+    this.reverseAdjList = {}
 
-    this.inDegree = {}
-    this.outDegree = {}
-
-    this.transactionCount = {}        // total transactions per account
-
-    this.transactions = []            // store full transaction objects
+    this.edges = []
+    this.transactions = []
   }
 
   addTransaction(tx) {
-    const { sender_id, receiver_id } = tx
+    const { sender_id, receiver_id, timestamp } = tx
 
-    // Add nodes
-    this.nodes.add(sender_id)
-    this.nodes.add(receiver_id)
-
-    // Initialize maps if not present
-    if (!this.adjList.has(sender_id)) {
-      this.adjList.set(sender_id, [])
+    // Initialize sender
+    if (!this.nodes[sender_id]) {
+      this.nodes[sender_id] = {
+        total_sent: 0,
+        total_received: 0,
+        transaction_count: 0,
+        first_tx: timestamp,
+        last_tx: timestamp
+      }
     }
 
-    if (!this.reverseAdjList.has(receiver_id)) {
-      this.reverseAdjList.set(receiver_id, [])
+    // Initialize receiver
+    if (!this.nodes[receiver_id]) {
+      this.nodes[receiver_id] = {
+        total_sent: 0,
+        total_received: 0,
+        transaction_count: 0,
+        first_tx: timestamp,
+        last_tx: timestamp
+      }
     }
 
-    // Add directed edge
-    this.adjList.get(sender_id).push(receiver_id)
-    this.reverseAdjList.get(receiver_id).push(sender_id)
+    // Update sender
+    this.nodes[sender_id].total_sent += 1
+    this.nodes[sender_id].transaction_count += 1
+    this.nodes[sender_id].first_tx =
+      Math.min(this.nodes[sender_id].first_tx, timestamp)
+    this.nodes[sender_id].last_tx =
+      Math.max(this.nodes[sender_id].last_tx, timestamp)
 
-    // Update degrees
-    this.outDegree[sender_id] = (this.outDegree[sender_id] || 0) + 1
-    this.inDegree[receiver_id] = (this.inDegree[receiver_id] || 0) + 1
+    // Update receiver
+    this.nodes[receiver_id].total_received += 1
+    this.nodes[receiver_id].transaction_count += 1
+    this.nodes[receiver_id].first_tx =
+      Math.min(this.nodes[receiver_id].first_tx, timestamp)
+    this.nodes[receiver_id].last_tx =
+      Math.max(this.nodes[receiver_id].last_tx, timestamp)
 
-    // Transaction count
-    this.transactionCount[sender_id] =
-      (this.transactionCount[sender_id] || 0) + 1
+    // Adjacency
+    if (!this.adjList[sender_id]) this.adjList[sender_id] = []
+    if (!this.reverseAdjList[receiver_id]) this.reverseAdjList[receiver_id] = []
 
-    this.transactionCount[receiver_id] =
-      (this.transactionCount[receiver_id] || 0) + 1
+    this.adjList[sender_id].push(receiver_id)
+    this.reverseAdjList[receiver_id].push(sender_id)
 
-    // Store transaction
+    this.edges.push(tx)
     this.transactions.push(tx)
   }
 }

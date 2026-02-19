@@ -11,20 +11,7 @@ function scoringEngine({
 
   let ringCounter = 1
 
-  // ----------------------------
-  // CONFIGURATION (Single Digit Base Weights)
-  // ----------------------------
-
-  const BASE_WEIGHTS = {
-    cycle: 7,
-    shell: 6,
-    "fan-in": 5,
-    "fan-out": 5
-  }
-
-  // ----------------------------
-  // Helper: Assign Ring ID
-  // ----------------------------
+  const MAX_RAW_SCORE = 110
 
   function generateRingId() {
     const id = "RING_" + String(ringCounter).padStart(3, "0")
@@ -32,11 +19,7 @@ function scoringEngine({
     return id
   }
 
-  // ----------------------------
-  // Helper: Add Score to Accounts
-  // ----------------------------
-
-  function addScore(account, rawContribution, patternType, ringId) {
+  function addScore(account, value, pattern, ringId) {
     if (!accountMap[account]) {
       accountMap[account] = {
         raw_score: 0,
@@ -45,24 +28,20 @@ function scoringEngine({
       }
     }
 
-    accountMap[account].raw_score += rawContribution
-    accountMap[account].detected_patterns.add(patternType)
+    accountMap[account].raw_score += value
+    accountMap[account].detected_patterns.add(pattern)
     accountMap[account].ring_ids.add(ringId)
   }
 
   // ----------------------------
-  // 1️⃣ Process Cycles
+  // 1️⃣ Cycles (+40)
   // ----------------------------
 
   for (let cycle of cycles) {
     const ringId = generateRingId()
-    const length = cycle.length
-
-    const multiplier = 1 + (length - 3) * 0.2
-    const rawContribution = BASE_WEIGHTS.cycle * multiplier
 
     for (let account of cycle) {
-      addScore(account, rawContribution, `cycle_length_${length}`, ringId)
+      addScore(account, 40, `cycle_length_${cycle.length}`, ringId)
     }
 
     fraudRings.push({
@@ -74,91 +53,90 @@ function scoringEngine({
   }
 
   // ----------------------------
-  // 2️⃣ Process Fan-In
+  // 2️⃣ Fan-In (+25)
   // ----------------------------
 
   for (let ring of fanInRings) {
     const ringId = generateRingId()
-    const members = ring.member_accounts
-    const uniqueSenders = members.length - 1
 
-    const multiplier = 1 + (uniqueSenders - 10) * 0.08
-    const rawContribution = BASE_WEIGHTS["fan-in"] * multiplier
-
-    for (let account of members) {
-      addScore(account, rawContribution, "fan-in", ringId)
+    for (let account of ring.member_accounts) {
+      addScore(account, 25, "fan_in", ringId)
     }
 
     fraudRings.push({
       ring_id: ringId,
-      member_accounts: members,
-      pattern_type: "fan-in",
+      member_accounts: ring.member_accounts,
+      pattern_type: "fan_in",
       risk_score: 0
     })
   }
 
   // ----------------------------
-  // 3️⃣ Process Fan-Out
+  // 3️⃣ Fan-Out (+25)
   // ----------------------------
 
   for (let ring of fanOutRings) {
     const ringId = generateRingId()
-    const members = ring.member_accounts
-    const uniqueReceivers = members.length - 1
 
-    const multiplier = 1 + (uniqueReceivers - 10) * 0.08
-    const rawContribution = BASE_WEIGHTS["fan-out"] * multiplier
-
-    for (let account of members) {
-      addScore(account, rawContribution, "fan-out", ringId)
+    for (let account of ring.member_accounts) {
+      addScore(account, 25, "fan_out", ringId)
     }
 
     fraudRings.push({
       ring_id: ringId,
-      member_accounts: members,
-      pattern_type: "fan-out",
+      member_accounts: ring.member_accounts,
+      pattern_type: "fan_out",
       risk_score: 0
     })
   }
 
   // ----------------------------
-  // 4️⃣ Process Shell Networks
+  // 4️⃣ Shell (+15)
   // ----------------------------
 
   for (let ring of shellRings) {
     const ringId = generateRingId()
-    const members = ring.member_accounts
-    const length = members.length
 
-    const multiplier = 1 + (length - 3) * 0.2
-    const rawContribution = BASE_WEIGHTS.shell * multiplier
-
-    for (let account of members) {
-      addScore(account, rawContribution, "shell", ringId)
+    for (let account of ring.member_accounts) {
+      addScore(account, 15, "shell_layer", ringId)
     }
 
     fraudRings.push({
       ring_id: ringId,
-      member_accounts: members,
+      member_accounts: ring.member_accounts,
       pattern_type: "shell",
       risk_score: 0
     })
   }
 
   // ----------------------------
-  // 5️⃣ Compute Theoretical Max Raw Score
+  // 5️⃣ High Velocity (+5)
   // ----------------------------
 
-  const maxCycle = 7 * (1 + (5 - 3) * 0.2)       // length 5
-  const maxShell = 6 * (1 + (5 - 3) * 0.2)
-  const maxFanIn = 5 * (1 + (20 - 10) * 0.08)   // assuming 20 senders
-  const maxFanOut = 5 * (1 + (20 - 10) * 0.08)
+  for (let accountId in graph.nodes) {
+    const node = graph.nodes[accountId]
 
-  const MAX_RAW = maxCycle + maxShell + maxFanIn + maxFanOut
+    if (!node || !node.first_tx || !node.last_tx) continue
+
+    const durationHours =
+      (node.last_tx - node.first_tx) / (1000 * 60 * 60)
+
+    let isHighVelocity = false
+
+    if (durationHours <= 0) {
+      isHighVelocity = node.transaction_count > 5
+    } else {
+      isHighVelocity =
+        node.transaction_count / Math.max(durationHours, 1) > 0.5
+    }
+
+    if (isHighVelocity) {
+      addScore(accountId, 5, "high_velocity", null)
+    }
+  }
 
   // ----------------------------
-  // 6️⃣ Final Suspicion Score (Linear Normalization)
-  // Never reaches 100
+  // 6️⃣ Normalize Scores
   // ----------------------------
 
   const suspiciousAccounts = []
@@ -166,48 +144,36 @@ function scoringEngine({
   for (let account in accountMap) {
     const raw = accountMap[account].raw_score
 
-    let finalScore = (raw / MAX_RAW) * 95
-
-    if (finalScore >= 95) {
-      finalScore = 95
-    }
-
-    finalScore = parseFloat(finalScore.toFixed(2))
+    let normalized = (raw / MAX_RAW_SCORE) * 100
+    normalized = parseFloat(normalized.toFixed(1))
 
     suspiciousAccounts.push({
       account_id: account,
-      suspicion_score: finalScore,
+      suspicion_score: normalized,
       detected_patterns: Array.from(accountMap[account].detected_patterns),
-      ring_id: Array.from(accountMap[account].ring_ids)[0]
+      ring_id: Array.from(accountMap[account].ring_ids).filter(Boolean)[0] || null
     })
   }
 
-  // Sort descending
   suspiciousAccounts.sort((a, b) => b.suspicion_score - a.suspicion_score)
 
   // ----------------------------
-  // 7️⃣ Compute Ring Risk Scores
+  // 7️⃣ Ring Risk Score (Average)
   // ----------------------------
 
   for (let ring of fraudRings) {
     let total = 0
+    let count = 0
 
     for (let member of ring.member_accounts) {
       const acc = suspiciousAccounts.find(a => a.account_id === member)
-      if (acc) total += acc.suspicion_score
+      if (acc) {
+        total += acc.suspicion_score
+        count++
+      }
     }
 
-    const avg = total / ring.member_accounts.length
-    const structuralMultiplier =
-      1 + (ring.member_accounts.length - 3) * 0.1
-
-    let ringScore = avg * structuralMultiplier
-
-    if (ringScore >= 95) {
-      ringScore = 95
-    }
-
-    ring.risk_score = parseFloat(ringScore.toFixed(2))
+    ring.risk_score = parseFloat((total / count).toFixed(1))
   }
 
   // ----------------------------
@@ -215,7 +181,7 @@ function scoringEngine({
   // ----------------------------
 
   const summary = {
-    total_accounts_analyzed: graph.nodes.size,
+    total_accounts_analyzed: Object.keys(graph.nodes).length,
     suspicious_accounts_flagged: suspiciousAccounts.length,
     fraud_rings_detected: fraudRings.length,
     processing_time_seconds: parseFloat(processingTimeSeconds.toFixed(2))
@@ -224,7 +190,7 @@ function scoringEngine({
   return {
     suspicious_accounts: suspiciousAccounts,
     fraud_rings: fraudRings,
-    summary: summary
+    summary
   }
 }
 

@@ -6,7 +6,7 @@ function findSmurfPatterns(graph) {
     (a, b) => a.timestamp - b.timestamp
   )
 
-  // 🔥 FAN-IN DETECTION
+  // FAN-IN
   const receiverMap = {}
 
   for (let tx of transactions) {
@@ -33,7 +33,7 @@ function findSmurfPatterns(graph) {
 
       if (windowSenders.size >= 10) {
         fanInRings.push({
-          pattern_type: "fan-in",
+          pattern_type: "fan_in",
           member_accounts: [receiver, ...windowSenders]
         })
         break
@@ -41,7 +41,7 @@ function findSmurfPatterns(graph) {
     }
   }
 
-  // 🔥 FAN-OUT DETECTION
+  // FAN-OUT
   const senderMap = {}
 
   for (let tx of transactions) {
@@ -68,7 +68,7 @@ function findSmurfPatterns(graph) {
 
       if (windowReceivers.size >= 10) {
         fanOutRings.push({
-          pattern_type: "fan-out",
+          pattern_type: "fan_out",
           member_accounts: [sender, ...windowReceivers]
         })
         break

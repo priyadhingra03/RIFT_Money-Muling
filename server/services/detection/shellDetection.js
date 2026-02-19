@@ -2,24 +2,27 @@ function findShellNetworks(graph) {
   const shellRings = []
 
   function dfs(current, path) {
-    if (path.length > 5) return   // limit depth to avoid explosion
+    if (path.length > 5) return
 
-    const neighbors = graph.adjList.get(current) || []
+    const neighbors = graph.adjList[current] || []
 
     for (let neighbor of neighbors) {
       if (!path.includes(neighbor)) {
         const newPath = [...path, neighbor]
 
-        // Check if path length >= 4 nodes (3 hops)
+        // 3+ hops means 4+ nodes
         if (newPath.length >= 4) {
           const intermediateNodes = newPath.slice(1, -1)
 
           const valid = intermediateNodes.every(node => {
-            const count = graph.transactionCount[node] || 0
+            const nodeData = graph.nodes[node]
+            if (!nodeData) return false
+
+            const count = nodeData.transaction_count
             return count >= 2 && count <= 3
           })
 
-          if (valid) {
+          if (valid && intermediateNodes.length > 0) {
             shellRings.push({
               pattern_type: "shell",
               member_accounts: newPath
@@ -32,7 +35,7 @@ function findShellNetworks(graph) {
     }
   }
 
-  for (let node of graph.nodes) {
+  for (let node of Object.keys(graph.nodes)) {
     dfs(node, [node])
   }
 
