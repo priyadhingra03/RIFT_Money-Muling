@@ -26,7 +26,7 @@ const UploadCSV = () => {
 
     try {
       const res = await axios.post(
-        "http://localhost:5000/api/upload",
+        "https://rift-money-muling.onrender.com/api/upload",
         formData,
         {
           headers: {
