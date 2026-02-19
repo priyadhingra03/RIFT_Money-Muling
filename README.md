@@ -173,7 +173,7 @@ Open **http://localhost:5173**
 
 | Limitation | Detail |
 |-----------|--------|
-| **File size** | Large CSVs (> 50k rows) may cause slow processing; no streaming pagination |
+| **File size** | Large CSVs (upto 10k transactions) may cause slow processing; no streaming pagination |
 | **Cycle depth** | Cycles longer than 5 hops are not detected by design |
 | **Fan threshold** | Fan-In/Out threshold of 10 senders/receivers is fixed; not configurable |
 | **No persistence** | Uploaded files are deleted immediately; no database storage |
