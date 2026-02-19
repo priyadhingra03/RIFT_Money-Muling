@@ -185,9 +185,9 @@ Open **http://localhost:5173**
 
 ## 👥 Team Members
 
-| Name | Role |
-|------|------|
-| Priya Dhingra | Full-Stack Development, Algorithm Design |
+| Priya Dhingra |
+| Varnika Singh Chandel |
+| Shivam Gupta |
 
 ---
 
